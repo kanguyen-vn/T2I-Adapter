@@ -49,7 +49,12 @@ class Downsample(nn.Module):
         stride = 2 if dims != 3 else (1, 2, 2)
         if use_conv:
             self.op = conv_nd(
-                dims, self.channels, self.out_channels, 3, stride=stride, padding=padding
+                dims,
+                self.channels,
+                self.out_channels,
+                3,
+                stride=stride,
+                padding=padding,
             )
         else:
             assert self.channels == self.out_channels
@@ -97,7 +102,15 @@ class ResnetBlock(nn.Module):
 
 
 class Adapter(nn.Module):
-    def __init__(self, channels=[320, 640, 1280, 1280], nums_rb=3, cin=64, ksize=3, sk=False, use_conv=True):
+    def __init__(
+        self,
+        channels=[320, 640, 1280, 1280],
+        nums_rb=3,
+        cin=64,
+        ksize=3,
+        sk=False,
+        use_conv=True,
+    ):
         super(Adapter, self).__init__()
         self.unshuffle = nn.PixelUnshuffle(8)
         self.channels = channels
@@ -107,10 +120,26 @@ class Adapter(nn.Module):
             for j in range(nums_rb):
                 if (i != 0) and (j == 0):
                     self.body.append(
-                        ResnetBlock(channels[i - 1], channels[i], down=True, ksize=ksize, sk=sk, use_conv=use_conv))
+                        ResnetBlock(
+                            channels[i - 1],
+                            channels[i],
+                            down=True,
+                            ksize=ksize,
+                            sk=sk,
+                            use_conv=use_conv,
+                        )
+                    )
                 else:
                     self.body.append(
-                        ResnetBlock(channels[i], channels[i], down=False, ksize=ksize, sk=sk, use_conv=use_conv))
+                        ResnetBlock(
+                            channels[i],
+                            channels[i],
+                            down=False,
+                            ksize=ksize,
+                            sk=sk,
+                            use_conv=use_conv,
+                        )
+                    )
         self.body = nn.ModuleList(self.body)
         self.conv_in = nn.Conv2d(cin, channels[0], 3, 1, 1)
 
@@ -129,6 +158,87 @@ class Adapter(nn.Module):
         return features
 
 
+class FourierEmbedder:
+    def __init__(self, num_freqs=64, temperature=100):
+        self.num_freqs = num_freqs
+        self.temperature = temperature
+        self.freq_bands = temperature ** (torch.arange(num_freqs) / num_freqs)
+
+    @torch.no_grad()
+    def __call__(self, x, cat_dim=-1):
+        "x: arbitrary shape of tensor. dim: cat dim"
+        out = []
+        for freq in self.freq_bands:
+            out.append(torch.sin(freq * x))
+            out.append(torch.cos(freq * x))
+        return torch.cat(out, cat_dim)
+
+
+class BboxAdapter(nn.Module):
+    def __init__(
+        self,
+        channels=[320, 640, 1280, 1280],
+        nums_rb=3,
+        cin=64,
+        ksize=3,
+        sk=False,
+        use_conv=True,
+        fourier_freqs=8,
+    ):
+        super(BboxAdapter, self).__init__()
+        self.unshuffle = nn.PixelUnshuffle(8)
+        self.channels = channels
+        self.nums_rb = nums_rb
+        self.body = []
+        for i in range(len(channels)):
+            for j in range(nums_rb):
+                if (i != 0) and (j == 0):
+                    self.body.append(
+                        ResnetBlock(
+                            channels[i - 1],
+                            channels[i],
+                            down=True,
+                            ksize=ksize,
+                            sk=sk,
+                            use_conv=use_conv,
+                        )
+                    )
+                else:
+                    self.body.append(
+                        ResnetBlock(
+                            channels[i],
+                            channels[i],
+                            down=False,
+                            ksize=ksize,
+                            sk=sk,
+                            use_conv=use_conv,
+                        )
+                    )
+        self.body = nn.ModuleList(self.body)
+        self.conv_in = nn.Conv2d(cin, channels[0], 3, 1, 1)
+        self.fourier_embedder = FourierEmbedder(num_freqs=fourier_freqs)
+        self.position_dim = fourier_freqs * 2 * 4  # 2 is sin&cos, 4 is xyxy
+
+    def forward(self, x, boxes, boxes_labels):
+        # unshuffle
+        x = self.unshuffle(x)
+        # extract features
+        features = []
+        x = self.conv_in(x)
+        for i in range(len(self.channels)):
+            for j in range(self.nums_rb):
+                idx = i * self.nums_rb + j
+                x = self.body[idx](x)
+            features.append(x)
+
+        # embedding position (it may includes padding as placeholder)
+        xyxy_embedding = self.fourier_embedder(boxes)  # B*N*4 --> B*N*C
+
+        text_bboxes_features = ...
+
+        return features
+
+
 class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
 
@@ -139,26 +249,34 @@ class LayerNorm(nn.LayerNorm):
 
 
 class QuickGELU(nn.Module):
-
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
 
 
 class ResidualAttentionBlock(nn.Module):
-
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
         super().__init__()
 
         self.attn = nn.MultiheadAttention(d_model, n_head)
         self.ln_1 = LayerNorm(d_model)
         self.mlp = nn.Sequential(
-            OrderedDict([("c_fc", nn.Linear(d_model, d_model * 4)), ("gelu", QuickGELU()),
-                         ("c_proj", nn.Linear(d_model * 4, d_model))]))
+            OrderedDict(
+                [
+                    ("c_fc", nn.Linear(d_model, d_model * 4)),
+                    ("gelu", QuickGELU()),
+                    ("c_proj", nn.Linear(d_model * 4, d_model)),
+                ]
+            )
+        )
         self.ln_2 = LayerNorm(d_model)
         self.attn_mask = attn_mask
 
     def attention(self, x: torch.Tensor):
-        self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
+        self.attn_mask = (
+            self.attn_mask.to(dtype=x.dtype, device=x.device)
+            if self.attn_mask is not None
+            else None
+        )
         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
 
     def forward(self, x: torch.Tensor):
@@ -168,12 +286,13 @@ class ResidualAttentionBlock(nn.Module):
 
 
 class StyleAdapter(nn.Module):
-
     def __init__(self, width=1024, context_dim=768, num_head=8, n_layes=3, num_token=4):
         super().__init__()
 
-        scale = width ** -0.5
-        self.transformer_layes = nn.Sequential(*[ResidualAttentionBlock(width, num_head) for _ in range(n_layes)])
+        scale = width**-0.5
+        self.transformer_layes = nn.Sequential(
+            *[ResidualAttentionBlock(width, num_head) for _ in range(n_layes)]
+        )
         self.num_token = num_token
         self.style_embedding = nn.Parameter(torch.randn(1, num_token, width) * scale)
         self.ln_post = LayerNorm(width)
@@ -183,14 +302,16 @@ class StyleAdapter(nn.Module):
     def forward(self, x):
         # x shape [N, HW+1, C]
         style_embedding = self.style_embedding + torch.zeros(
-            (x.shape[0], self.num_token, self.style_embedding.shape[-1]), device=x.device)
+            (x.shape[0], self.num_token, self.style_embedding.shape[-1]),
+            device=x.device,
+        )
         x = torch.cat([x, style_embedding], dim=1)
         x = self.ln_pre(x)
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer_layes(x)
         x = x.permute(1, 0, 2)  # LND -> NLD
 
-        x = self.ln_post(x[:, -self.num_token:, :])
+        x = self.ln_post(x[:, -self.num_token :, :])
         x = x @ self.proj
 
         return x
@@ -243,9 +364,25 @@ class Adapter_light(nn.Module):
         self.body = []
         for i in range(len(channels)):
             if i == 0:
-                self.body.append(extractor(in_c=cin, inter_c=channels[i]//4, out_c=channels[i], nums_rb=nums_rb, down=False))
+                self.body.append(
+                    extractor(
+                        in_c=cin,
+                        inter_c=channels[i] // 4,
+                        out_c=channels[i],
+                        nums_rb=nums_rb,
+                        down=False,
+                    )
+                )
             else:
-                self.body.append(extractor(in_c=channels[i-1], inter_c=channels[i]//4, out_c=channels[i], nums_rb=nums_rb, down=True))
+                self.body.append(
+                    extractor(
+                        in_c=channels[i - 1],
+                        inter_c=channels[i] // 4,
+                        out_c=channels[i],
+                        nums_rb=nums_rb,
+                        down=True,
+                    )
+                )
         self.body = nn.ModuleList(self.body)
 
     def forward(self, x):
@@ -261,19 +398,27 @@ class Adapter_light(nn.Module):
 
 
 class CoAdapterFuser(nn.Module):
-    def __init__(self, unet_channels=[320, 640, 1280, 1280], width=768, num_head=8, n_layes=3):
+    def __init__(
+        self, unet_channels=[320, 640, 1280, 1280], width=768, num_head=8, n_layes=3
+    ):
         super(CoAdapterFuser, self).__init__()
-        scale = width ** 0.5
+        scale = width**0.5
         # 16, maybe large enough for the number of adapters?
         self.task_embedding = nn.Parameter(scale * torch.randn(16, width))
-        self.positional_embedding = nn.Parameter(scale * torch.randn(len(unet_channels), width))
+        self.positional_embedding = nn.Parameter(
+            scale * torch.randn(len(unet_channels), width)
+        )
         self.spatial_feat_mapping = nn.ModuleList()
         for ch in unet_channels:
-            self.spatial_feat_mapping.append(nn.Sequential(
-                nn.SiLU(),
-                nn.Linear(ch, width),
-            ))
-        self.transformer_layes = nn.Sequential(*[ResidualAttentionBlock(width, num_head) for _ in range(n_layes)])
+            self.spatial_feat_mapping.append(
+                nn.Sequential(
+                    nn.SiLU(),
+                    nn.Linear(ch, width),
+                )
+            )
+        self.transformer_layes = nn.Sequential(
+            *[ResidualAttentionBlock(width, num_head) for _ in range(n_layes)]
+        )
         self.ln_post = LayerNorm(width)
         self.ln_pre = LayerNorm(width)
         self.spatial_ch_projs = nn.ModuleList()
@@ -314,7 +459,9 @@ class CoAdapterFuser(nn.Module):
         for cond_name in features.keys():
             if not isinstance(features[cond_name], list):
                 length = features[cond_name].size(1)
-                transformed_feature = features[cond_name] * ((x[:, cur_seq_idx:cur_seq_idx+length] @ self.seq_proj) + 1)
+                transformed_feature = features[cond_name] * (
+                    (x[:, cur_seq_idx : cur_seq_idx + length] @ self.seq_proj) + 1
+                )
                 if ret_feat_seq is None:
                     ret_feat_seq = transformed_feature
                 else:
@@ -325,13 +472,15 @@ class CoAdapterFuser(nn.Module):
             length = len(features[cond_name])
             transformed_feature_list = []
             for idx in range(length):
-                alpha = self.spatial_ch_projs[idx](x[:, cur_seq_idx+idx])
+                alpha = self.spatial_ch_projs[idx](x[:, cur_seq_idx + idx])
                 alpha = alpha.unsqueeze(-1).unsqueeze(-1) + 1
                 transformed_feature_list.append(features[cond_name][idx] * alpha)
             if ret_feat_map is None:
                 ret_feat_map = transformed_feature_list
             else:
-                ret_feat_map = list(map(lambda x, y: x + y, ret_feat_map, transformed_feature_list))
+                ret_feat_map = list(
+                    map(lambda x, y: x + y, ret_feat_map, transformed_feature_list)
+                )
             cur_seq_idx += length
 
         assert cur_seq_idx == x.size(1)
