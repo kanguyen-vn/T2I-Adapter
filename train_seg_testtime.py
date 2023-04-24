@@ -9,7 +9,9 @@ from basicsr.utils import (
     get_root_logger,
     get_env_info,
 )
-from ldm.data.dataset_coco import dataset_coco_mask_color
+
+# from ldm.data.dataset_coco import dataset_coco_mask_color
+from ldm.data.dataset_box import dataset_coco_box
 import argparse
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler

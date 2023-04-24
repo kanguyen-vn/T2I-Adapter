@@ -144,8 +144,11 @@ class Adapter(nn.Module):
         self.conv_in = nn.Conv2d(cin, channels[0], 3, 1, 1)
 
     def forward(self, x):
+        print(f"{x.shape = }")
         # unshuffle
         x = self.unshuffle(x)
+
+        print(f"unshuffled {x.shape = }")
         # extract features
         features = []
         x = self.conv_in(x)
@@ -153,6 +156,7 @@ class Adapter(nn.Module):
             for j in range(self.nums_rb):
                 idx = i * self.nums_rb + j
                 x = self.body[idx](x)
+            print(f"{features.shape = }")
             features.append(x)
 
         return features
@@ -177,6 +181,8 @@ class FourierEmbedder:
 class BboxAdapter(nn.Module):
     def __init__(
         self,
+        in_dim,
+        out_dim,
         channels=[320, 640, 1280, 1280],
         nums_rb=3,
         cin=64,
@@ -186,6 +192,9 @@ class BboxAdapter(nn.Module):
         fourier_freqs=8,
     ):
         super(BboxAdapter, self).__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+
         self.unshuffle = nn.PixelUnshuffle(8)
         self.channels = channels
         self.nums_rb = nums_rb
@@ -219,7 +228,28 @@ class BboxAdapter(nn.Module):
         self.fourier_embedder = FourierEmbedder(num_freqs=fourier_freqs)
         self.position_dim = fourier_freqs * 2 * 4  # 2 is sin&cos, 4 is xyxy
 
+        self.linears_text = nn.Sequential(
+            nn.Linear(self.in_dim + self.position_dim, 512),
+            nn.SiLU(),
+            nn.Linear(512, 512),
+            nn.SiLU(),
+            nn.Linear(512, out_dim),
+        )
+
+        self.linears_fusion = nn.Sequential(
+            nn.Linear(out_dim, 512),
+            nn.SiLU(),
+            nn.Linear(512, 512),
+            nn.SiLU(),
+            nn.Linear(512, out_dim),
+        )
+
     def forward(self, x, boxes, boxes_labels):
+        assert boxes_labels.shape[-1] == self.in_dim
+        # embedding position (it may includes padding as placeholder)
+        xyxy_embedding = self.fourier_embedder(boxes)  # B*N*4 --> B*N*C
+        objs_text = self.linears_text(torch.cat([boxes_labels, xyxy_embedding], dim=-1))
+
         # unshuffle
         x = self.unshuffle(x)
         # extract features
@@ -230,9 +260,6 @@ class BboxAdapter(nn.Module):
                 idx = i * self.nums_rb + j
                 x = self.body[idx](x)
             features.append(x)
-
-        # embedding position (it may includes padding as placeholder)
-        xyxy_embedding = self.fourier_embedder(boxes)  # B*N*4 --> B*N*C
 
         text_bboxes_features = ...
 
