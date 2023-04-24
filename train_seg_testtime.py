@@ -205,6 +205,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
     device = "cuda"
     torch.cuda.set_device(opt.local_rank)
+    print("Finished dist init.")
 
     text_encoder = FrozenCLIPEmbedder()
 
@@ -250,6 +251,10 @@ if __name__ == "__main__":
         sk=True,
         use_conv=False,
     ).to(device)
+
+    print(
+        f"Adapter parameter count: {sum(p.numel() for p in model_ad.parameters() if p.requires_grad):,}."
+    )
 
     # to gpus
     model_ad = torch.nn.parallel.DistributedDataParallel(
