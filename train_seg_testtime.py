@@ -189,7 +189,7 @@ parser.add_argument(
     help="gpu idx",
 )
 parser.add_argument(
-    "--local_rank", default=0, type=int, help="node rank for distributed training"
+    "--local-rank", default=0, type=int, help="node rank for distributed training"
 )
 parser.add_argument(
     "--launcher", default="pytorch", type=str, help="node rank for distributed training"
