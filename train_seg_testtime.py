@@ -214,7 +214,7 @@ if __name__ == "__main__":
     train_dataset = dataset_coco_box(
         path_json_train,
         root_path_im="/projects/vision/kiet/adapter/train2017",
-        root_path_mask="/projects/vision/kiet/adapter/layouts",
+        root_path_box="/projects/vision/kiet/adapter/layouts",
         image_size=512,
         text_encoder=text_encoder,
     )
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     val_dataset = dataset_coco_box(
         path_json_val,
         root_path_im="/projects/vision/kiet/adapter/val2017",
-        root_path_mask="/projects/vision/kiet/adapter/layouts-val",
+        root_path_box="/projects/vision/kiet/adapter/layouts-val",
         image_size=512,
         text_encoder=text_encoder,
     )
