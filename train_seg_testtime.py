@@ -201,10 +201,11 @@ if __name__ == "__main__":
     opt.name = config["name"]
 
     # distributed setting
+    torch.cuda.set_device(opt.local_rank)
     init_dist(opt.launcher)
     torch.backends.cudnn.benchmark = True
     device = "cuda"
-    torch.cuda.set_device(opt.local_rank)
+    # torch.cuda.set_device(opt.local_rank)
     print("Finished dist init.")
 
     text_encoder = FrozenCLIPEmbedder()
