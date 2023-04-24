@@ -96,7 +96,7 @@ def load_resume_state(opt):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--bsize", type=int, default=8, help="the prompt to render")
+parser.add_argument("--bsize", type=int, default=2, help="the prompt to render")
 parser.add_argument("--epochs", type=int, default=10000, help="the prompt to render")
 parser.add_argument("--num_workers", type=int, default=8, help="the prompt to render")
 parser.add_argument(
