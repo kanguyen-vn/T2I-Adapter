@@ -61,16 +61,15 @@ class dataset_coco_box:
         else:
             boxes = boxes[: self.max_objs]
         boxes = torch.tensor(boxes)
+        if len(file["labels"]) < self.max_objs:
+            file["labels"] = file["labels"] + (self.max_objs - len(labels)) * [""]
+        else:
+            file["labels"] = file["labels"][: self.max_objs]
         labels = []
         for label in file["labels"]:
             encoded_label = self.text_encoder(label).squeeze(0)
             labels.append(encoded_label)
-        if len(labels) < self.max_objs:
-            labels = labels + (self.max_objs - len(labels)) * [
-                torch.zeros_like(labels[0].shape[-2], labels[0].shape[-1])
-            ]
-        else:
-            labels = labels[: self.max_objs]
+
         labels = torch.stack(labels)
 
         return {
