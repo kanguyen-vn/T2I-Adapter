@@ -16,6 +16,7 @@ import argparse
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.dpm_solver import DPMSolverSampler
+from ldm.modules.encoders.modules import FrozenCLIPEmbedder
 from omegaconf import OmegaConf
 from ldm.util import instantiate_from_config
 from ldm.modules.encoders.adapter import Adapter
@@ -205,21 +206,25 @@ if __name__ == "__main__":
     device = "cuda"
     torch.cuda.set_device(opt.local_rank)
 
+    text_encoder = FrozenCLIPEmbedder()
+
     # dataset
-    path_json_train = "coco_stuff/mask/annotations/captions_train2017.json"
-    path_json_val = "coco_stuff/mask/annotations/captions_val2017.json"
-    train_dataset = dataset_coco_mask_color(
+    path_json_train = "/projects/vision/kiet/adapter/captions-train-box.json"
+    path_json_val = "/projects/vision/kiet/adapter/captions-val-box.json"
+    train_dataset = dataset_coco_box(
         path_json_train,
-        root_path_im="coco/train2017",
-        root_path_mask="coco_stuff/mask/train2017_color",
+        root_path_im="/projects/vision/kiet/adapter/train2017",
+        root_path_mask="/projects/vision/kiet/adapter/layouts",
         image_size=512,
+        text_encoder=text_encoder,
     )
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    val_dataset = dataset_coco_mask_color(
+    val_dataset = dataset_coco_box(
         path_json_val,
-        root_path_im="coco/val2017",
-        root_path_mask="coco_stuff/mask/val2017_color",
+        root_path_im="/projects/vision/kiet/adapter/val2017",
+        root_path_mask="/projects/vision/kiet/adapter/layouts-val",
         image_size=512,
+        text_encoder=text_encoder,
     )
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
