@@ -62,7 +62,9 @@ class dataset_coco_box:
             boxes = boxes[: self.max_objs]
         boxes = torch.tensor(boxes)
         if len(file["labels"]) < self.max_objs:
-            file["labels"] = file["labels"] + (self.max_objs - len(labels)) * [""]
+            file["labels"] = file["labels"] + (self.max_objs - len(file["labels"])) * [
+                ""
+            ]
         else:
             file["labels"] = file["labels"][: self.max_objs]
         labels = []
