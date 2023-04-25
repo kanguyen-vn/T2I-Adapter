@@ -233,7 +233,8 @@ if __name__ == "__main__":
         batch_size=opt.bsize,
         shuffle=(train_sampler is None),
         num_workers=opt.num_workers,
-        pin_memory=True,
+        # pin_memory=True,
+        pin_memory=False,
         sampler=train_sampler,
     )
     val_dataloader = torch.utils.data.DataLoader(
