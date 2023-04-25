@@ -209,7 +209,7 @@ if __name__ == "__main__":
     init_dist(opt.launcher)
     torch.backends.cudnn.benchmark = True
     device = "cuda"
-    opt.local_rank = os.environ["LOCAL_RANK"]
+    opt.local_rank = int(os.environ["LOCAL_RANK"])
     print(f"first {opt.local_rank = }")
     torch.cuda.set_device(opt.local_rank)
 
