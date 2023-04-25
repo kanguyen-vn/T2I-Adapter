@@ -157,7 +157,7 @@ class Adapter(nn.Module):
             for j in range(self.nums_rb):
                 idx = i * self.nums_rb + j
                 x = self.body[idx](x)
-            print(f"{features.shape = }")
+            print(f"{[f.shape for f in features] = }")
             features.append(x)
 
         return features
