@@ -52,16 +52,10 @@ def _init_dist_slurm(backend, port=None):
         # 29500 is torch.distributed default port
         os.environ["MASTER_PORT"] = "29500"
     os.environ["MASTER_ADDR"] = addr
-    if "WORLD_SIZE" not in os.environ:
-        os.environ["WORLD_SIZE"] = str(ntasks)
-    if "LOCAL_RANK" not in os.environ:
-        os.environ["LOCAL_RANK"] = str(proc_id % num_gpus)
+    os.environ["WORLD_SIZE"] = str(ntasks)
+    os.environ["LOCAL_RANK"] = str(proc_id % num_gpus)
     os.environ["RANK"] = str(proc_id)
-    dist.init_process_group(
-        backend=backend,
-        world_size=int(os.environ["WORLD_SIZE"]),
-        rank=int(os.environ["RANK"]),
-    )
+    dist.init_process_group(backend=backend)
 
 
 def get_dist_info():
