@@ -205,12 +205,13 @@ if __name__ == "__main__":
     opt.name = config["name"]
 
     # distributed setting
-    print(f"first {opt.local_rank = }")
-    torch.cuda.set_device(opt.local_rank)
+    # torch.cuda.set_device(opt.local_rank)
     init_dist(opt.launcher)
     torch.backends.cudnn.benchmark = True
     device = "cuda"
-    # torch.cuda.set_device(opt.local_rank)
+    opt.local_rank = os.environ["LOCAL_RANK"]
+    print(f"first {opt.local_rank = }")
+    torch.cuda.set_device(opt.local_rank)
 
     text_encoder = FrozenCLIPEmbedder()
 
