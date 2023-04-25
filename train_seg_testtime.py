@@ -218,7 +218,7 @@ if __name__ == "__main__":
         root_path_im="/projects/vision/kiet/adapter/train2017",
         root_path_box="/projects/vision/kiet/adapter/layouts",
         image_size=512,
-        text_encoder=text_encoder,
+        # text_encoder=text_encoder,
     )
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     val_dataset = dataset_coco_box(
@@ -226,15 +226,15 @@ if __name__ == "__main__":
         root_path_im="/projects/vision/kiet/adapter/val2017",
         root_path_box="/projects/vision/kiet/adapter/layouts-val",
         image_size=512,
-        text_encoder=text_encoder,
+        # text_encoder=text_encoder,
     )
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=opt.bsize,
         shuffle=(train_sampler is None),
         num_workers=opt.num_workers,
-        # pin_memory=True,
-        pin_memory=False,
+        pin_memory=True,
+        # pin_memory=False,
         sampler=train_sampler,
     )
     val_dataloader = torch.utils.data.DataLoader(
@@ -271,7 +271,7 @@ if __name__ == "__main__":
     params = list(model_ad.parameters())
     optimizer = torch.optim.AdamW(params, lr=config["training"]["lr"])
 
-    experiments_root = osp.join("experiments", opt.name)
+    experiments_root = osp.join("/projects/vision/kiet/adapter/experiments", opt.name)
 
     # resume state
     resume_state = load_resume_state(opt)

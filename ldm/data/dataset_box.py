@@ -12,7 +12,7 @@ class dataset_coco_box:
         root_path_im,
         root_path_box,
         image_size,
-        text_encoder,
+        # text_encoder,
         max_objs=30,
     ):
         super(dataset_coco_box, self).__init__()
@@ -36,7 +36,7 @@ class dataset_coco_box:
                     "labels": labels,
                 }
             )
-        self.text_encoder = text_encoder
+        # self.text_encoder = text_encoder
         self.max_objs = max_objs
 
     def __getitem__(self, idx):
@@ -67,18 +67,19 @@ class dataset_coco_box:
             ]
         else:
             file["labels"] = file["labels"][: self.max_objs]
-        labels = []
-        for label in file["labels"]:
-            encoded_label = self.text_encoder(label).squeeze(0)
-            labels.append(encoded_label)
+        # labels = []
+        # for label in file["labels"]:
+        #     encoded_label = self.text_encoder(label).squeeze(0)
+        #     labels.append(encoded_label)
 
-        labels = torch.stack(labels)
+        # labels = torch.stack(labels)
 
         return {
             "im": im,
             "mask": mask,
             "boxes": boxes,
-            "labels": labels,
+            # "labels": labels,
+            "labels": file["labels"],
             "sentence": sentence,
         }
 
