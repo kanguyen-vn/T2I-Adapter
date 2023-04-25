@@ -313,6 +313,9 @@ if __name__ == "__main__":
     # copy the yml file to the experiment root
     copy_opt_file(opt.config, experiments_root)
 
+    # fid_scorer = FrechetInceptionDistance(feature=64)
+    # clip_scorer = CLIPScore(model_name_or_path="openai/clip-vit-base-patch16")
+
     # training
     logger.info(f"Start training from epoch: {start_epoch}, iter: {current_iter}")
     for epoch in range(start_epoch, opt.epochs):
@@ -327,7 +330,7 @@ if __name__ == "__main__":
                 )
                 z = model.module.get_first_stage_encoding(z)
 
-            mask = data["mask"]
+            mask = data["mask"].cuda(opt.local_rank)
             optimizer.zero_grad()
             model.zero_grad()
             features_adapter = model_ad(mask)
@@ -409,6 +412,11 @@ if __name__ == "__main__":
                     for id_sample, x_sample in enumerate(x_samples_ddim):
                         x_sample = 255.0 * x_sample
                         img = x_sample.astype(np.uint8)
+
+                        label = 255.0 * data["im"]
+                        label = label.astype(np.uint8)
+                        label = np.transpose(label, (1, 2, 0))
+
                         img = cv2.putText(
                             img.copy(),
                             data["sentence"][0],
@@ -426,4 +434,5 @@ if __name__ == "__main__":
                             ),
                             img[:, :, ::-1],
                         )
+
                     break
