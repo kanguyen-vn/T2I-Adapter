@@ -144,12 +144,8 @@ class Adapter(nn.Module):
         self.conv_in = nn.Conv2d(cin, channels[0], 3, 1, 1)
 
     def forward(self, x):
-        print(f"{x.shape = }")
         # unshuffle
         x = self.unshuffle(x)
-
-        print(f"unshuffled {x.shape = }")
-        print(f"{x.device = }")
         # extract features
         features = []
         x = self.conv_in(x)
@@ -157,7 +153,7 @@ class Adapter(nn.Module):
             for j in range(self.nums_rb):
                 idx = i * self.nums_rb + j
                 x = self.body[idx](x)
-            print(f"{[f.shape for f in features] = }")
+            # print(f"{[f.shape for f in features] = }")
             features.append(x)
 
         return features

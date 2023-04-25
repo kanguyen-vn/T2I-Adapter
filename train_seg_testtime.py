@@ -10,6 +10,8 @@ from basicsr.utils import (
     get_env_info,
 )
 
+from tqdm import tqdm
+
 # from ldm.data.dataset_coco import dataset_coco_mask_color
 from ldm.data.dataset_box import dataset_coco_box
 import argparse
@@ -323,7 +325,9 @@ if __name__ == "__main__":
     for epoch in range(start_epoch, opt.epochs):
         train_dataloader.sampler.set_epoch(epoch)
         # train
-        for _, data in enumerate(train_dataloader):
+        for _, data in tqdm(
+            enumerate(train_dataloader), total=len(train_dataloader.dataset) / opt.bsize
+        ):
             current_iter += 1
             with torch.no_grad():
                 c = model.module.get_learned_conditioning(data["sentence"])
