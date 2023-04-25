@@ -193,7 +193,7 @@ parser.add_argument(
     help="gpu idx",
 )
 parser.add_argument(
-    "--local-rank", default=0, type=int, help="node rank for distributed training"
+    "--local_rank", default=0, type=int, help="node rank for distributed training"
 )
 parser.add_argument(
     "--launcher", default="pytorch", type=str, help="node rank for distributed training"
@@ -330,7 +330,7 @@ if __name__ == "__main__":
                 )
                 z = model.module.get_first_stage_encoding(z)
 
-            mask = data["mask"].cuda(opt.local_rank)
+            mask = data["mask"]
             optimizer.zero_grad()
             model.zero_grad()
             features_adapter = model_ad(mask)
