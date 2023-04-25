@@ -30,6 +30,10 @@ from basicsr.utils.options import copy_opt_file, dict2str
 import logging
 from dist_util import init_dist, master_only, get_bare_model, get_dist_info
 
+_ = torch.manual_seed(42)
+from torchmetrics.image.fid import FrechetInceptionDistance
+from torchmetrics.multimodal.clip_score import CLIPScore
+
 
 def load_model_from_config(config, ckpt, verbose=False):
     print(f"Loading model from {ckpt}")
@@ -206,7 +210,6 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
     device = "cuda"
     # torch.cuda.set_device(opt.local_rank)
-    print("Finished dist init.")
 
     text_encoder = FrozenCLIPEmbedder()
 
@@ -257,6 +260,8 @@ if __name__ == "__main__":
     print(
         f"Adapter parameter count: {sum(p.numel() for p in model_ad.parameters() if p.requires_grad):,}."
     )
+
+    print(f"{opt.local_rank = }")
 
     # to gpus
     model_ad = torch.nn.parallel.DistributedDataParallel(

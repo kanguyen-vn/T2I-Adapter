@@ -149,6 +149,7 @@ class Adapter(nn.Module):
         x = self.unshuffle(x)
 
         print(f"unshuffled {x.shape = }")
+        print(f"{x.device = }")
         # extract features
         features = []
         x = self.conv_in(x)
